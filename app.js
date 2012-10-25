@@ -1,282 +1,90 @@
-var express = require('express'),
-  poolModule = require('generic-pool'),
-  util = require('util'),
-  fs = require('fs'),
-  mongoDb = require('mongodb'),
-  Db = mongoDb.Db,
-  Connection = mongoDb.Connection,
- Server = mongoDb.Server,
-  ObjectID = mongoDb.ObjectID;
-
-var port = (process.env.VMC_APP_PORT || 3000);
-var host = (process.env.VCAP_APP_HOST || 'localhost');
-
-if (process.env.VCAP_SERVICES) {
-  var env = JSON.parse(process.env.VCAP_SERVICES);
-  var mongo = env['mongodb-1.8'][0]['credentials'];
-}else {
-  var mongo = {
-    "hostname": "localhost",
-    "port": 27017,
-    "username": "",
-    "password": "",
-    "name": "",
-    "db": "kino"
-  }
-}
-
-/**
- * Prepare a Pool of mongodb connections
- */
-var pool = poolModule.Pool({
-  name: 'mongodb',
-  /**
-   * Creating a connection
-   */
-  create: function(callback) {
-    var db = new Db(mongo.db, new Server(mongo.hostname, mongo.port, {
-      'auto_reconnect': true,
-      'poolSize': 5
-    }));
-    db.open(function(err, connection) {
-      callback(null, connection);
-    });
-  },
-
-  destroy: function(connection) {
-    if (connection !== null) {
-      connection.close();
-    }
-  },
-  max: 10,
-  min: 2,
-  idleTimeoutMillis: 3000,
-  log: false
-});
-
-
+var express = require('express');
+var Facebook = require('facebook-node-sdk');
 var app = express();
 
+var userService = require('./service/userService').service();
+var subscriptionService = require('./service/subscriptionService').service();
+var badgeService = require('./service/badgeService').service();
+
+app.configure(function() {
+  app.use(express.bodyParser());
+  app.use(express.cookieParser());
+  app.use(express.session({ secret: 'foo bar' }));
+  app.use(Facebook.middleware({ appId: '275083449277082', secret: '8fbef9ec42cc581b366e16d8cb568c4e' }));
+});
 
 /**
- * Serving static content
- * TODO figure out better way of serving static content
+ * Static content handling
  */
 
-var index_data;
-
-fs.readFile('./index.html', function(err, data) {
-    if (err) {
-      throw err;
-    }else{
-      index_data = data;
-    }
+app.get('/isomorphic/*', function(req, res) {
+  res.sendfile(__dirname + '/isomorphic/' + req.params[0]);
 });
 
-app.get('/index', function(request, response) {
-  response.set('Content-Type', 'text/html');
-  response.send(200, index_data);
+app.get('/public/*', function(req, res) {
+  res.sendfile(__dirname + '/public/' + req.params[0]);
 });
 
-var kino_client_js_data;
-
-fs.readFile('./kino_client.js', function(err, data) {
-  if (err) {
-    throw err;
-  }else{
-    kino_client_js_data = data;
-  }
+app.get('/images/*', function(req, res) {
+  res.sendfile(__dirname + '/public/' + req.params[0]);
 });
-
-app.get('/kino_client.js', function(request, response) {
-  response.set('Content-Type', "application/javascript");
-  response.send(kino_client_js_data);
-});
-
-app.get('/lib/backbone.js', function(request, response) {
-  fs.readFile('./lib/backbone.js', function(err, data) {
-    if (err) {
-      throw err;
-    }
-    response.set('Content-Type', "application/javascript");
-    response.send(data);
-  });
-
-});
-
-app.get('/lib/jquery-1.8.1.js', function(request, response) {
-  fs.readFile('./lib/jquery-1.8.1.js', function(err, data) {
-    if (err) {
-      throw err;
-    }
-    response.set('Content-Type', "application/javascript");
-    response.send(data);
-  });
-});
-
-app.get('/lib/underscore.js', function(request, response) {
-  fs.readFile('./lib/underscore.js', function(err, data) {
-    if (err) {
-      throw err;
-    }
-    response.set('Content-Type', "application/javascript");
-    response.send(data);
-  });
-});
-
-app.get('/css/styles.css', function(request, response) {
-  fs.readFile('./css/styles.css', function(err, data) {
-    if (err) {
-      throw err;
-    }
-    response.set('Content-Type', "text/css");
-    response.send(data);
-  });
-
-});
-
 
 /**
- * REST service route(s)
+ Approach for User Authentication via client-side (Browser)
+ *
+ */
+var fbUser;
+
+// Landing page
+app.get('/', function(req, res) {
+  res.sendfile(__dirname + '/public/login-modal.html');
+});
+
+// FB Authentication page
+/*
+ app.get('/fbLogin',function(req,res){
+ res.sendfile(__dirname + '/public/login.html');
+ });
  */
 
-app.get('/env',function(request,response){
-  response.set('Content-Type', "application/json");
-  response.send(200,JSON.stringify(process.env));
-});
-
-app.get('/user', function(request, response) {
-  mongoDb.connect(mongourl, function(err, connection){
-    if (err) {
-      console.log("Error obtaining connection");
-    } else {
-      if (connection !== null) {
-        // fetch the collection country
-        connection.collection('User', function(err, collection) {
-          collection.find(function(err, cursor) {
-            cursor.toArray(function(err, docs) {
-              response.set('Content-Type', "application/json");
-              if (docs !== null) {
-                response.send(JSON.stringify(docs));
-              } else {
-                response.send(200,JSON.stringify({"error" : "no records"}));
-              }
-            });
-          });
-        });
-
-      } else {
-        response.set('Content-Type', "application/json");
-        response.send(500,"{error: 'unable to connect to db'}"); // Indicate internal server error
-      }
-
-    }
-  });
-});
-
-
-
-var findOneUser = function(request, response) {
-  // fetch all the records
-  mongoDb.connect(mongourl, function(err, connection){
-    if (err) {
-      console.log("Error obtaining connection");
-      response.send(500);
-    } else {
-      connection.collection('User', function(err, collection) {
-        collection.findOne({"_id": new ObjectID(request.params.id)}, function(err, doc) {
-          response.set('Content-Type', "application/json");
-          if (doc !== null) {
-            response.send(JSON.stringify(doc));
-          } else {
-            response.send(200, "{error : 'no results returned'}");
-          }
-        });
-      })
-    }
-  });
-}
-
-
-app.get('/user/:id', findOneUser);
-
-var saveOrUpdate = function(request, response) {
-  // accept a record and save it ( if _id is present it would be simply updated)
-  var body = '';
-
-  request.on('data', function(data) {
-    body += data;
-  });
-
-  request.on('end', function() {
-    var document = JSON.parse(body);
-
-    if (document._id) {
-      document._id = new ObjectID(document._id);
-    }
-
-    mongoDb.connect(mongourl, function(err, connection){
-      if (err) {
-        console.log("Error obtaining connection");
-      } else {
-        // fetch the collection country
-        connection.collection('User', function(err, collection) {
-          response.set('Content-Type', "application/json");
-          collection.save(document, function(err) {
-            if (err == null) {
-              response.send("document saved.");
-            } else {
-              response.send(500,"{error : 'unable to save'}");
-            }
-          });
-        })
-      }
+/**
+ * Approach for User Authentication via server-side
+ */
+app.get('/fbLogin',
+  //Facebook.loginRequired(),
+  function(req, res) {
+    req.facebook.api('/me', function(err, user) {
+      //fbUser = user;
+      res.sendfile(__dirname + '/public/index.html');
     });
   });
-}
 
-app.post('/user', saveOrUpdate);     // As per REST specification do the INSERT with Post
-
-app.put('/user', saveOrUpdate);    // As per REST specification do the UPDATE with PUT
-
-app.delete('/user/:id', function(req, res) {
-  var _id = new ObjectID(req.params.id);
-
-  mongoDb.connect(mongourl, function(err, connection){
-    if (err) {
-      console.log("Error obtaining connection");
-    } else {
-      // fetch the collection country
-      connection.collection('User', function(err, collection) {
-        collection.remove({"_id": _id}, function(err) {
-          response.set('Content-Type', "application/json");
-          if (err == null) {
-            res.send('{"success" : true}');
-          } else {
-            res.send(500,'{"success" : false}');
-          }
-        });
-      });
-    }
-  });
-
+app.get('/data/subscription/all', function(req, res) {
+  subscriptionService.getAllSubscriptions(function(subscriptions) {
+    res.set('Content-Type', "application/javascript");
+    res.send(JSON.stringify(subscriptions));
+  })
 });
 
-var generate_mongo_url = function(obj) {
-  obj.hostname = (obj.hostname || 'localhost');
-  obj.port = (obj.port || 27017);
-  obj.db = (obj.db || 'kino');
+app.post('/data/badges', function(req, res) {
+  var subscription = req.body;
+  req.session.subscription = subscription; // save this in session
+  badgeService.getBadgesBySubscription(subscription,function(badges){
+    res.set('Content-Type', "application/javascript");
+    res.send(JSON.stringify(badges));
+  });
+});
 
-  if (obj.username && obj.password) {
-    return "mongodb://" + obj.username + ":" + obj.password + "@" + obj.hostname + ":" + obj.port + "/" + obj.db;
-  }
-  else {
-    return "mongodb://" + obj.hostname + ":" + obj.port + "/" + obj.db;
-  }
-}
+app.post('/data/users', function(req, res) {
+  var subscription = req.body;
+  userService.getUsersBySubscription(subscription,function(users){
+    res.set('Content-Type', "application/javascript");
+    res.send(JSON.stringify(users));
+  });
+});
 
-var mongourl = generate_mongo_url(mongo);
-var port = (process.env.VMC_APP_PORT || 3000);
-var host = (process.env.VCAP_APP_HOST || 'localhost');
+app.get('/fbUser', function(req, res) {
+  res.send(JSON.stringify(fbUser));
+});
 
-app.listen(port,host);
+app.listen(3000, '172.24.211.21');
