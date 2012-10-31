@@ -2,8 +2,8 @@ var subscriptionDataService = require('./subscriptionDataService').service();
 
 exports.service = function() {
   return {
-    getAllSubscriptions : function(callBack){
-      subscriptionDataService.getAllSubscriptions(function(subscriptions){
+    getAllSubscriptions : function(user,callBack){
+      subscriptionDataService.getAllSubscriptions(user,function(subscriptions){
         // Some business logic
         // Alter the record for display purpose
         callBack(subscriptions);

@@ -6,7 +6,6 @@
 
 
 var genericDataService = require('./genericDataService').service();
-var pool = genericDataService.pool();
 var ObjectID = genericDataService.getObjectId();
 
 exports.service = function() {
@@ -16,12 +15,27 @@ exports.service = function() {
         callBack(subscription.users);
       });
     },
-    getAllSubscriptions: function(callBack) {
-      genericDataService.findByCriteria('Subscription',{},callBack);
+    /**
+     *
+     * @param user
+     * @param callBack
+     * @return all the subscriptions for a particular user
+     */
+    getAllSubscriptions: function(user,callBack) {
+      var subscriptionIds = [];
+      user.subscriptions.forEach(function(subscription){
+        var ObjectId = genericDataService.getObjectId();
+        subscriptionIds.push(ObjectId(subscription._id));
+      });
+      genericDataService.findByCriteria('Subscription', {"_id": {$in: subscriptionIds}}, callBack);
     },
+
     getSubscription: function(subscription, callBack) {
-      genericDataService.findOneById('Subscription',subscription._id,callBack);
+      genericDataService.findOneById('Subscription',subscription._id,function(subscription){
+        callBack(subscription);
+      });
     },
+
     updateSubscription: function(subscription, callBack) {
       return {};
     }

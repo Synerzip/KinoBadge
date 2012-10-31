@@ -13,22 +13,30 @@ exports.service = function() {
   return {
     getUsersBySubscription: function(subscription, callBack) {
       userDataService.getUsersBySubscription(subscription, function(users) {
-        badgeDataService.getBadgesBySubscription(subscription, function(badges) {
-          users.forEach(function(user) {
-            user.badges.forEach(function(myBadge) {
-              badges.forEach(function(badge) {
-                // we need to check ObjectId of badge._id against the string of myBadge._id
-                if (badge._id == myBadge._id) {
-                  user[badge.name] = 1;
-                } else {
-                  user[badge.name] = 0;
-                }
+        if(users && users.length > 0){
+          badgeDataService.getBadgesBySubscription(subscription, function(badges) {
+            users.forEach(function(user) {
+              user.badges.forEach(function(myBadge) {
+                badges.forEach(function(badge) {
+                  // we need to check ObjectId of badge._id against the string of myBadge._id
+                  if (badge._id == myBadge._id) {
+                    user[badge.name] = 1;
+                  } else {
+                    user[badge.name] = 0;
+                  }
+                });
               });
             });
-          });
+
           callBack(users);
-        });
+          });
+        }else{
+          callBack([]);
+        }
       });
+    },
+    getUserByOAuthId: function(fbUser,callBack){
+      userDataService.getUserByOAuthId(fbUser,callBack);
     }
   }
 };
