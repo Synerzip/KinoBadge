@@ -6,7 +6,6 @@
 
 
 var genericDataService = require('./genericDataService').service();
-var pool = genericDataService.pool();
 var ObjectID = genericDataService.getObjectId();
 var subscriptionDataService = require('./subscriptionDataService').service();
 
