@@ -3,11 +3,10 @@
  * Infrastructure pieces are also included along.
  */
 
-var poolModule = require('generic-pool'),
-  mongoDb = require('mongodb'),
+var mongoDb = require('mongodb'),
   Db = mongoDb.Db,
   ObjectID = require('mongodb').ObjectID;
-  Server = mongoDb.Server;
+Server = mongoDb.Server;
 
 if (process.env.VCAP_SERVICES) {
   var env = JSON.parse(process.env.VCAP_SERVICES);
@@ -23,39 +22,22 @@ if (process.env.VCAP_SERVICES) {
   }
 }
 
-/**
- * Prepare a Pool of mongodb connections
- * As soon as the module is loaded
- */
-var pool = poolModule.Pool({
-  name: 'mongodb',
-  /**
-   * Creating a connection
-   */
-  create: function(callback) {
-    //var db = new Db(mongo.db, new Server(mongo.hostname, mongo.port, {safe: true, auto_reconnect: true}, {strict: true}));
-    var db = new Db('test',new Server('localhost', 27017), {safe:true,auto_reconnect : true});
-    db.open(function(err, connection) {
-      callback(null, connection);
-    });
-  },
+var db = new Db('test', new Server('localhost', 27017), {safe: true, auto_reconnect: true});
 
-  destroy: function(connection) {
-    if (connection !== null) {
-      connection.close();
-    }
-  },
-  max: 10,
-  min: 2,
-  idleTimeoutMillis: 3000,
-  log: false
+var pConnection = null;
+/**
+ * Here is where the nodejs really shines.
+ * We need not prepare a connection pool, MongoDB driver internally manages the
+ * connection pool for us. Eventually anything we query, would be associated with
+ * a callback which would be eventually called once the query returns result and
+ * is pushed into the event-callback-queue.
+ */
+db.open(function(err, connection) {
+  pConnection = connection; // let there be a single connection.... mongodb-driver manages the connection pool internally
 });
 
 exports.service = function() {
   return {
-    pool: function() {
-      return pool;
-    },
     getObjectId: function() {
       return ObjectID;
     },
@@ -67,22 +49,30 @@ exports.service = function() {
      *
      * @returns Returns the obtained doc
      */
-    findOneById : function(collectionName,_id,callBack){
-      pool.acquire(function(err, connection) {
-        if (err) {
-          console.log("Error obtaining connection");
-        } else {
-          connection.collection(collectionName, function(err, collection) {
-            collection.findOne({"_id": ObjectID(_id)}, function(err, doc) {
-              if (doc !== null) {
-                callBack(doc);
-              } else {
-                // no matching record is found
-              }
-            });
-
-          })
-        }
+    findOneById: function(collectionName, _id, callBack) {
+      pConnection.collection(collectionName, function(err, collection) {
+        collection.findOne({"_id": ObjectID(_id)}, function(err, doc) {
+          if (!err) {
+            callBack(doc);
+          }
+        });
+      });
+    },
+    /**
+     *
+     * @param collectionName
+     * @param criteria
+     * @param callBack
+     *
+     * @returns a single doc on the basis of the criteria
+     */
+    findOneByCriteria: function(collectionName, criteria, callBack) {
+      pConnection.collection(collectionName, function(err, collection) {
+        collection.findOne(criteria, function(err, doc) {
+          if (!err) {
+            callBack(doc);
+          }
+        });
       });
     },
     /**
@@ -94,27 +84,17 @@ exports.service = function() {
      * @returns an array of documents, matching the criteria from a collection
      *
      * If all records need to returned from a collection, then an empty
-     * object literal needs to be passed as the criteria
+     * object literal {}  needs to be passed as the criteria
      */
-    findByCriteria: function(collectionName,criteria,callBack){
-      pool.acquire(function(err, connection) {
-        if (err) {
-          console.log("Error obtaining connection");
-        } else {
-          connection.collection(collectionName, function(err, collection) {
-            collection.find(criteria,function(err, cursor) {
-              console.log("Criteria --- ",JSON.stringify(criteria));
-              cursor.toArray(function(err, docs) {
-                if (docs !== null) {
-                  console.log("  Docs " + JSON.stringify(docs));
-                  callBack(docs); // return all the subscriptions
-                } else {
-                  // cursor didn't returned any records
-                }
-              });
-            });
-          })
-        }
+    findByCriteria: function(collectionName, criteria, callBack) {
+      pConnection.collection(collectionName, function(err, collection) {
+        collection.find(criteria, function(err, cursor) {
+          cursor.toArray(function(err, docs) {
+            if (!err) {
+              callBack(docs);
+            }
+          });
+        });
       });
     }
   };

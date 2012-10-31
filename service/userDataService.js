@@ -8,20 +8,23 @@
 var genericDataService = require('./genericDataService').service();
 var subscriptionDataService = require('./subscriptionDataService').service();
 
-var pool = genericDataService.pool();
-
 exports.service = function() {
   return {
     getUsersBySubscription: function(subscription, callBack) {
       // Fetch the subscription
       subscriptionDataService.getSubscription(subscription, function(subscription) {
         var criteriaUsers = [];
-        subscription.users.forEach(function(user) {
-          var ObjectId = genericDataService.getObjectId();
-          criteriaUsers.push(new ObjectId(user._id));
-        });
-        // Query with a criteria object
-        genericDataService.findByCriteria('User', {"_id": {$in: criteriaUsers}},callBack);
+
+        if (subscription.users) {
+          subscription.users.forEach(function(user) {
+            var ObjectId = genericDataService.getObjectId();
+            criteriaUsers.push(new ObjectId(user._id));
+            // Query with a criteria object
+            genericDataService.findByCriteria('User', {"_id": {$in: criteriaUsers}}, callBack);
+          });
+        } else {
+          callBack([]);  // return an empty array
+        }
       });
     },
 
@@ -35,6 +38,9 @@ exports.service = function() {
 
     getUser: function(user, callBack) {
 
+    },
+    getUserByOAuthId : function(fbUser,callBack){
+      genericDataService.findOneByCriteria('User',{id:fbUser.id},callBack);
     }
   };
 };
