@@ -3,11 +3,17 @@
  */
 var subscriptionDS = isc.DataSource.create({
   ID: "subscriptionDS",
+  operationBindings: [
+      {operationType: "fetch", dataProtocol: "getParams"},
+      {operationType: "add", dataProtocol: "postParams"},
+      {operationType: "remove", dataProtocol: "getParams", requestProperties: {httpMethod: "DELETE"}},
+      {operationType: "update", dataProtocol: "postParams", requestProperties: {httpMethod: "PUT"}}
+    ],
   fields: [
     {name: "name", title: "Name"}
   ],
   dataFormat: "json",
-  dataURL: "/data/subscription/all"
+  dataURL: "/data/subscription"
 });
 
 var subscriberToolStrip =
@@ -57,12 +63,10 @@ var subscriptionList = isc.ListGrid.create({
   ],
   recordClick: function(viewer, record, recordNum, field, fieldNum, value, rawValue) {
     subscriptionForm.loadItem(record);  // load the subscription form with the record
-
-    badgeList.fetchData({_id: record._id}, function(dsResponse, data, dsRequest) {
+    badgeList.fetchData({subscriptionId: record._id}, function(dsResponse, data, dsRequest) {
       userList.addCustomFields(data); // upon reception of subscriberBadgeList update the userListGrid with custom fields
     });
-
-    userList.fetchData({_id: record._id}, function(dsResponse, data, dsRequest) {
+    userList.fetchData({subscriptionId: record._id}, function(dsResponse, data, dsRequest) {
       // call back over userListGrid
     });
   },
@@ -85,10 +89,23 @@ var subscriptionList = isc.ListGrid.create({
 });
 
 var subscriptionForm = isc.DynamicForm.create({
-  ID: "formBasic",
+  ID: "subscriptionForm",
+  dataSource: subscriptionDS,
   fields: [
-    {name: "name", type: "text", title: "Name", disabled: false},
-    {name: "description", type: "textArea", title: "Description"}
+    {name: "name", type: "textArea", title: "Name"},
+    {name: "description", type: "textArea", title: "Description"},
+    {name: "saveSubscription",title: "Save", type:"button",
+      click:function(){
+        var record = subscriptionList.getSelectedRecord();
+
+        record.description = subscriptionForm.getItem('description').getValue();
+
+        subscriptionList.updateData({rawJSON:JSON.stringify(record)},function(){
+          // callback function post update operation
+        },{
+          // optional properties to be passed to the request
+        });
+    }}
   ],
   loadItem: function(subscription) {
     this.getField('name').setValue(subscription.name);

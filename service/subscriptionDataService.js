@@ -35,9 +35,11 @@ exports.service = function() {
         callBack(subscription);
       });
     },
-
+    saveSubscription:function(subscription,callBack){
+      genericDataService.save("Subscription",subscription,null,callBack);
+    },
     updateSubscription: function(subscription, callBack) {
-      return {};
+      genericDataService.update("Subscription",{"_id": new ObjectID(subscription._id)},subscription,null,callBack);
     }
   };
 };
