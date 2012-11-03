@@ -27,7 +27,6 @@ exports.service = function() {
                 });
               });
             });
-
           callBack(users);
           });
         }else{
@@ -37,6 +36,14 @@ exports.service = function() {
     },
     getUserByOAuthId: function(fbUser,callBack){
       userDataService.getUserByOAuthId(fbUser,callBack);
+    },
+    updateUser: function(user,callBack){
+     console.log(JSON.stringify(user));
+     callBack(user);
+    },
+    saveUser: function(user,callBack){
+      console.log("Save the user -- "+JSON.stringify(user));
+      callBack(user);
     }
   }
 };
