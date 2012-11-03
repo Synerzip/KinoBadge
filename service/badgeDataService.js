@@ -31,8 +31,11 @@ exports.service = function() {
           callBack(badge);
         });
     },
-    updateBadge: function(subscription, badge, callBack) {
-      return {};  // TODO
+    updateBadge: function(badge, callBack) {
+      genericDataService.update("Badge",{"_id": new ObjectID(badge._id)},badge,null,callBack);
+    },
+    saveBadge: function(badge,callBack){
+      genericDataService.save("Badge",badge,null,callBack);
     }
   };
 };

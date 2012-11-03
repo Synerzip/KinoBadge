@@ -3,13 +3,16 @@ var userDS = isc.DataSource.create({
   dataFormat: "json",
   dataURL: "/data/users",
   operationBindings: [
-    {operationType: "fetch", dataProtocol: "postParams"},
-    {operationType: "update", dataProtocol: "postParams"}
+    {operationType: "fetch", dataProtocol: "getParams"},
+    {operationType: "add", dataProtocol: "postParams"},
+    {operationType: "remove", dataProtocol: "getParams", requestProperties: {httpMethod: "DELETE"}},
+    {operationType: "update", dataProtocol: "postParams", requestProperties: {httpMethod: "PUT"}}
   ], fields: [
-    {name: "name", title: "Name", name: "40%"}
+    {name: "name", title: "Name", name: "40%", canEdit: true},
+    {name: "email", title: "Email", name: "40%", canEdit: true}
   ],
   autoFetchData: false,
-  showPrompt:true,
+  showPrompt: true,
   preventHTTPCaching: true,
   cacheMaxAge: 1, /*time in seconds*/
   prompt: "Please wait updating page",
@@ -21,11 +24,11 @@ var userToolStrip =
   isc.ToolStrip.create({
     ID: "userToolStrip",
     width: "100%", height: 24,
-    totalsLabel: function(){
+    totalsLabel: function() {
       return this.members[0];
     },
     members: [
-    isc.Label.create({
+      isc.Label.create({
         padding: 5,
         ID: "totalsLabelUser"
       }),
@@ -99,26 +102,47 @@ var userList = isc.ListGrid.create({
     }
   },
   recordClick: function(viewer, record, recordNum, field, fieldNum, value, rawValue) {
-      uploadFormTabSet.selectTab(1);
-      userUploadForm.loadItem(record);
-    }
+    uploadFormTabSet.selectTab(1);
+    userUploadForm.loadItem(record);
+  }
 });
 
 var userUploadForm = isc.DynamicForm.create({
   width: 250,
-  dataSource:userDS,
+  dataSource: userDS,
   fields: [
-    {name: "name", title: "Name", type: "text", required: true, defaultValue: ""},
-    {name: "email", title: "Email", required: true, type: "text", defaultValue: ""},
+    {name: "name", title: "Name", type: "text", required: true, defaultValue: "", canEdit: true},
+    {name: "email", title: "Email", type: "text", required: true, defaultValue: "", canEdit: true},
     {
-      name: "saveUser", title: "Save User",type: "button",
-      click: function(){
-        alert("Save call");
+      name: "saveUser", title: "Save User", type: "button",
+      click: function() {
+        var record = {
+          name: userUploadForm.getItem('name').getValue(),
+          email: userUploadForm.getItem('email').getValue(),
+          _id: null
+        };
+        userList.addData({rawJSON:JSON.stringify(record)}, function() {
+          // callback to be fired once data is uploaded
+        }, {
+          // optional properties for updating the data
+        });
       }
     },
-    {name: "updateUser", title: "Update User", type: "button", click: function(){
-      alert("Update call");
-    }},
+    {name: "updateUser", title: "Update User", type: "button",
+      click: function() {
+        // Get the selected record and update the rest of the stuff
+        var record = userList.getSelectedRecord();
+
+        record.name = userUploadForm.getItem('name').getValue();
+        record.email = userUploadForm.getItem('email').getValue();
+
+        userList.updateData({rawJSON:JSON.stringify(record)}, function() {
+          // callback to be fired once the data is uploaded
+        }, {
+          // optional properties for updating the data
+        });
+      }
+    },
     {name: "clearForm", title: "Clear", type: "button", click: ""}
   ],
   loadItem: function(user) {

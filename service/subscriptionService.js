@@ -12,6 +12,12 @@ exports.service = function() {
     getSubscription : function(subscription,callBack){
       // first argument is the criteria object to subscription
       subscriptionDataService.getSubscription(subscription,callBack);
+    },
+    saveSubscription : function(subscription,callBack){
+      subscriptionDataService.saveSubscription(subscription,callBack);
+    },
+    updateSubscription : function(subscription,callBack){
+      subscriptionDataService.updateSubscription(subscription,callBack);
     }
   };
 };

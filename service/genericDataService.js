@@ -22,7 +22,7 @@ if (process.env.VCAP_SERVICES) {
   }
 }
 
-var db = new Db('test', new Server('localhost', 27017), {safe: true, auto_reconnect: true});
+var db = new Db('kino', new Server('localhost', 27017), {safe: true, auto_reconnect: true});
 
 var pConnection = null;
 /**
@@ -33,7 +33,11 @@ var pConnection = null;
  * is pushed into the event-callback-queue.
  */
 db.open(function(err, connection) {
-  pConnection = connection; // let there be a single connection.... mongodb-driver manages the connection pool internally
+  if(!err){
+    pConnection = connection; // let there be a single connection.... mongodb-driver manages the connection pool internally
+  }else{
+    console.log("Connection Err --->" + JSON.stringify(err));
+  }
 });
 
 exports.service = function() {
@@ -95,6 +99,50 @@ exports.service = function() {
             }
           });
         });
+      });
+    },
+    /**
+     *
+     * @param collectionName
+     * @param object
+     * @param callBack
+     *
+     * @returns the persisted document
+     *
+     */
+    save:function(collectionName,object,options,callBack){
+      pConnection.collection(collectionName,function(err,collection){
+        collection.save(object,options,function(err,doc){
+          if(!err){
+            callBack(doc);
+          }
+        });
+      });
+    },
+    /**
+     *
+     * @param collectionName
+     * @param selector
+     * @param object
+     * @param options
+     * @param callBack
+     *
+     * @returns the updated document
+     *
+     */
+    update:function(collectionName,selector,object,options,callBack){
+      pConnection.collection(collectionName,function(err,collection){
+        if(object._id){
+          console.log("found id -- "+object._id);
+          delete(object._id);
+        }
+        collection.update(selector,object,options,function(err,doc){
+          if(!err){
+            callBack(doc);
+          }else{
+            callBack({});
+          }
+        })
       });
     }
   };
