@@ -44,13 +44,9 @@ app.get('/', function(req, res) {
  * Uses FB authentication
  */
 app.get('/fbLogin',
-  Facebook.loginRequired(), // uncomment it for FB Authentication
+  Facebook.loginRequired(),
   function(req, res) {
     req.facebook.api('/me', function(err, fbUser) { // uncomment it for fetching FB User JSON
-  //  var fbUser = {
-  //    id: "100000353297074", username: "hussainpw", link: "http://www.facebook.com/hussainpw" // for local testing
-  //  };
-
     userService.getUserByOAuthId(fbUser, function(user) {
       req.session.user = user;
       res.sendfile(__dirname + '/public/index.html');
@@ -62,7 +58,6 @@ app.get('/fbLogin',
  */
 app.get('/data/subscription', function(req, res) {
   res.set('Content-Type', "application/javascript");
-  var user = req.session.user;
   subscriptionService.getAllSubscriptions(req.session.user, function(subscriptions) {
     res.send(JSON.stringify(subscriptions));
   })
@@ -157,8 +152,10 @@ app.put('/data/users', function(req, res) {
   });
 });
 
+/**
 app.get('/fbUser', function(req, res) {
   res.send(JSON.stringify(req.session.user));
 });
+*/
 
 app.listen(3000, 'localhost');
